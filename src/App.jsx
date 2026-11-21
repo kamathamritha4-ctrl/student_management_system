@@ -1,71 +1,103 @@
+
 import { useEffect, useState } from 'react';
 import Navbar from './components/NavbarComp';
 import HomePage from './pages/HomePage';
 import StudentsPage from './pages/StudentsPage';
 import StudentFormPage from './pages/StudentFormPage';
 import './App.css';
-// This is the name used to save our student list in the browser.
+
 const STORAGE_KEY = 'student-management-students';
+
 function App() {
-// Read saved students when the app starts. If there are none, use an empty list.
-const [students, setStudents] = useState(() => {
-const savedStudents = localStorage.getItem(STORAGE_KEY);
+  // Load saved students from localStorage.
+  const [students, setStudents] = useState(() => {
+    const savedStudents = localStorage.getItem(STORAGE_KEY);
+    return savedStudents ? JSON.parse(savedStudents) : [];
+  });
 
+  // Keep localStorage synchronized with the students list.
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+  }, [students]);
 
-return savedStudents ? JSON.parse(savedStudents) : [];
-});
-// Keep the browser's saved copy in sync whenever the list changes.
-useEffect(() => {
-localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
-}, [students]);
-// The URL path tells us which simple page to display.
-const path = window.location.pathname;
-const editMatch = path.match(/^\/edit\/([^/]+)$/);
-const studentToEdit = editMatch
-? students.find((student) => student.id === editMatch[1])
-: null;
-// Add a unique id, save the new list, then show the students page.
-function addStudent(studentDetails) {
-const updatedStudents = [
-...students,
-{ ...studentDetails, id: Date.now().toString() },
-];
-localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedStudents));
-setStudents(updatedStudents);
-window.location.href = '/students';
+  // Get the current URL path.
+  const path = window.location.pathname;
+
+  // Match URLs such as /edit/123456789.
+  const editMatch = path.match(/^\/edit\/([^/]+)$/);
+
+  // Find the student being edited.
+  const studentToEdit = editMatch
+    ? students.find((student) => student.id === editMatch[1])
+    : null;
+
+  // Add a new student.
+  function addStudent(studentDetails) {
+    const updatedStudents = [
+      ...students,
+      {
+        ...studentDetails,
+        id: Date.now().toString(),
+      },
+    ];
+
+    setStudents(updatedStudents);
+    window.location.href = '/students';
+  }
+
+  // Update an existing student.
+  function updateStudent(updatedStudent) {
+    const updatedStudents = students.map((student) =>
+      student.id === updatedStudent.id
+        ? updatedStudent
+        : student
+    );
+
+    setStudents(updatedStudents);
+    window.location.href = '/students';
+  }
+
+  // Delete a student after confirmation.
+  function deleteStudent(id) {
+    if (window.confirm('Delete this student?')) {
+      const updatedStudents = students.filter(
+        (student) => student.id !== id
+      );
+
+      setStudents(updatedStudents);
+    }
+  }
+
+  // Display the appropriate page.
+  let page;
+
+  if (path === '/students') {
+    page = (
+      <StudentsPage
+        students={students}
+        onDelete={deleteStudent}
+      />
+    );
+  } else if (path === '/add-student') {
+    page = <StudentFormPage onSave={addStudent} />;
+  } else if (editMatch && studentToEdit) {
+    page = (
+      <StudentFormPage
+        student={studentToEdit}
+        onSave={updateStudent}
+      />
+    );
+  } else {
+    page = <HomePage studentCount={students.length} />;
+  }
+
+  // Shared navbar and selected page.
+  return (
+    <>
+      <Navbar />
+      {page}
+    </>
+  );
 }
-// Replace the matching student while keeping the rest of the list.
-function updateStudent(updatedStudent) {
-const updatedStudents = students.map((student) =>
-student.id === updatedStudent.id ? updatedStudent : student,
-);
-localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedStudents));
-setStudents(updatedStudents);
-window.location.href = '/students';
-}
-// Ask for confirmation, then make a new list without the deleted student.
-function deleteStudent(id) {
-if (window.confirm('Delete this student?')) {
-setStudents(students.filter((student) => student.id !== id));
-}
-}
-// Choose a page based on the current URL.
-let page;
-if (path === '/students') {
-page = <StudentsPage students={students} onDelete={deleteStudent} />;
-} else if (path === '/add-student') {
-page = <StudentFormPage onSave={addStudent} />;
-} else if (editMatch && studentToEdit) {
-page = <StudentFormPage student={studentToEdit} onSave={updateStudent} />;
-} else {
-page = <HomePage studentCount={students.length} />;
-}
-// The navbar is shared by every page; the selected page appears below it.
-return (
-<>
-<Navbar />
-{page}
-</>
-);
-}
+
 export default App;
